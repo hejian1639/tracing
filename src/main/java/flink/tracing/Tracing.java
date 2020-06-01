@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
 
 @Slf4j
 public class Tracing {
@@ -29,7 +30,9 @@ public class Tracing {
                 .map(tracingLog -> new Tuple2<>(tracingLog.traceId, tracingLog.line))
                 .returns(Types.TUPLE(Types.STRING, Types.STRING))
                 .keyBy(0)
-                .countWindowAll(2)
+//                .countWindowAll(200)
+//                .windowAll(GlobalWindows.create()).trigger(LogPurgingTrigger.of(LogCountTrigger.of(2)))
+                .windowAll(GlobalWindows.create()).trigger(LogCountTrigger.of(2))
                 .reduce((t1, t2) -> new Tuple2<>(t1.f0, t1.f1 + t2.f1))
                 .map(t -> new Tuple2<>(t.f0, MD5Tool.getText(t.f1)))
                 .returns(Types.TUPLE(Types.STRING, Types.STRING))
