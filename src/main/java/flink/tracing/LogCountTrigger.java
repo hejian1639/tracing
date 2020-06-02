@@ -51,7 +51,7 @@ public class LogCountTrigger<W extends Window> extends Trigger<Object, W> {
 			count.clear();
 			return TriggerResult.FIRE_AND_PURGE;
 		}
-		return TriggerResult.CONTINUE;
+		return TriggerResult.FIRE;
 	}
 
 	@Override
