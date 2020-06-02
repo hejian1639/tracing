@@ -1,13 +1,16 @@
 package flink.tracing;
 
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
+import org.apache.flink.streaming.api.functions.co.CoMapFunction;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
-import org.apache.flink.streaming.api.windowing.time.Time;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 public class Tracing {
@@ -17,8 +20,21 @@ public class Tracing {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
 
-        env.addSource(new HttpSource("http://172.17.162.177:8001/trace1.data"))
-                .map(line -> new TracingLog(line))
+        val source1 = env.addSource(new HttpSource("http://172.17.162.177:8001/trace1.data"));
+        val source2 = env.addSource(new HttpSource("http://172.17.162.177:8001/trace2.data"));
+
+        source1.connect(source2)
+                .map(new CoMapFunction<String, String, TracingLog>() {
+                    @Override
+                    public TracingLog map1(String line) {
+                        return new TracingLog(line);
+                    }
+
+                    @Override
+                    public TracingLog map2(String line) {
+                        return new TracingLog(line);
+                    }
+                })
                 .filter(tracingLog -> {
                     if (tracingLog.tags.containsKey("http.status_code")) {
                         return tracingLog.tags.getInteger("http.status_code") != 200;
@@ -45,9 +61,12 @@ public class Tracing {
     }
 
     static class OutputSink implements SinkFunction<Tuple2<String, String>> {
+        Map<String, String> map = new HashMap<>();
+
         @Override
         public void invoke(Tuple2<String, String> record) {
             System.out.println(record);
+            map.put(record.f0, record.f1);
         }
 
     }
